@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سیستم کنترل کیفیت هوشمند</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --primary: #4a90e2;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        h1 { color: #333; text-align: center; margin-bottom: 30px; }
+
+        .input-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+            width: 100%;
+            transition: background 0.3s;
+        }
+
+        button:hover { background-color: #357abd; }
+        button:disabled { background-color: #ccc; }
+
+        /* بخش نمایش نتایج */
+        #resultsArea {
+            display: none; /* در ابتدا مخفی */
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .result-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .full-width { grid-column: span 2; }
+
+        .status-badge {
+            display: inline-block;
+            padding: 8px 15px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+        }
+        .pass { background-color: var(--success); }
+        .fail { background-color: var(--danger); }
+
+        .analysis-item {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+        }
+        .analysis-item span:first-child { color: #666; }
+        .active-flag { color: var(--primary); font-weight: bold; }
+        .inactive-flag { color: #ccc; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* لودینگ */
+        .loader {
+            display: none;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        @media (max-width: 600px) {
+            #resultsArea { grid-template-columns: 1fr; }
+            .full-width { grid-column: span 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🔍 کنترل کیفیت هوشمند چت</h1>
+
+        <div class="input-card">
+            <label for="chatInput">متن چت را اینجا وارد کنید:</label>
+            <textarea id="chatInput" placeholder="مثال: سلام خسته نباشید..."></textarea>
+            <button onclick="analyzeChat()" id="submitBtn">بررسی مکالمه</button>
+            <div class="loader" id="loader"></div>
+        </div>
+
+        <div id="resultsArea">
+
+            <div class="result-card full-width" style="text-align: center;">
+                <h3>نتیجه نهایی</h3>
+                <div id="finalStatus" class="status-badge">...</div>
+                <p id="finalReason" style="font-size: 1.1em; color: #444;"></p>
+            </div>
+
+            <div class="result-card">
+                <h3>⚙️ آنالیز اولیه (پایتون)</h3>
+                <div id="pythonFlags"></div>
+            </div>
+
+            <div class="result-card">
+                <h3>🤖 جزئیات هوش مصنوعی</h3>
+                <ul id="aiDetails" style="padding-right: 20px;"></ul>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        async function analyzeChat() {
+            const chatText = document.getElementById('chatInput').value;
+            const btn = document.getElementById('submitBtn');
+            const loader = document.getElementById('loader');
+            const resultsArea = document.getElementById('resultsArea');
+
+            if (!chatText.trim()) {
+                alert("لطفا متن چت را وارد کنید!");
+                return;
+            }
+
+            // UI changes
+            btn.disabled = true;
+            btn.innerText = "در حال پردازش...";
+            loader.style.display = "block";
+            resultsArea.style.display = "none";
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_text: chatText })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    alert("خطا: " + data.error);
+                } else {
+                    renderResults(data);
+                }
+
+            } catch (error) {
+                alert("خطای ارتباط با سرور: " + error);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "بررسی مکالمه";
+                loader.style.display = "none";
+            }
+        }
+
+        function renderResults(data) {
+            const resultsArea = document.getElementById('resultsArea');
+            const pyAnalysis = data.python_analysis;
+            const aiResult = data.ai_result;
+
+            // 1. کارت وضعیت نهایی
+            const statusBadge = document.getElementById('finalStatus');
+            if (aiResult.value) {
+                statusBadge.innerText = "✅ تایید شد (Pass)";
+                statusBadge.className = "status-badge pass";
+            } else {
+                statusBadge.innerText = "❌ رد شد (Fail)";
+                statusBadge.className = "status-badge fail";
+            }
+            document.getElementById('finalReason').innerText = aiResult.reasoning;
+
+            // 2. کارت فلگ‌های پایتون
+            const flagsContainer = document.getElementById('pythonFlags');
+            flagsContainer.innerHTML = `
+                <div class="analysis-item">
+                    <span>تشخیص تشکر:</span>
+                    <span class="${pyAnalysis.has_user_gratitude ? 'active-flag' : 'inactive-flag'}">
+                        ${pyAnalysis.has_user_gratitude ? 'بله' : 'خیر'}
+                    </span>
+                </div>
+                <div class="analysis-item">
+                    <span>تشخیص احوال‌پرسی:</span>
+                    <span class="${pyAnalysis.has_user_greeting ? 'active-flag' : 'inactive-flag'}">
+                        ${pyAnalysis.has_user_greeting ? 'بله' : 'خیر'}
+                    </span>
+                </div>
+                <div class="analysis-item">
+                    <span>شروع توسط کارشناس:</span>
+                    <span class="${pyAnalysis.agent_started_first ? 'active-flag' : 'inactive-flag'}">
+                        ${pyAnalysis.agent_started_first ? 'بله' : 'خیر'}
+                    </span>
+                </div>
+            `;
+
+            // 3. کارت جزئیات AI
+            const listContainer = document.getElementById('aiDetails');
+            listContainer.innerHTML = "";
+            if (aiResult.detected_items && aiResult.detected_items.length > 0) {
+                aiResult.detected_items.forEach(item => {
+                    const li = document.createElement('li');
+                    li.innerText = item;
+                    listContainer.appendChild(li);
+                });
+            } else {
+                listContainer.innerHTML = "<span style='color:#999'>مورد خاصی لیست نشده است.</span>";
+            }
+
+            // نمایش
+            resultsArea.style.display = "grid";
+        }
+    </script>
+</body>
+</html>
